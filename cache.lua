@@ -45,35 +45,26 @@
                 else
                    ngx.log(ngx.INFO, "NGINX-LUA-CACHE:[RENDERING] Required cached location [" .. capturedLocation .. "] rendered successfully")
                 end
-                
-                local headersString = ""
-                for key, value in pairs(renderedResult.header) do
-            	    headersString = headersString .. key .. ": " .. value .. "\r\n"
-                end
-                ngx.say(headersString)
-                
+
                 local smartCacheTTL = renderedResult.header['X-Smart-Cache-TTL']
                 if smartCacheTTL == nil then
-            	    smartCacheTTL = 0
+                    smartCacheTTL = 0
                 end
-                ngx.say("X-Smart-Cache-TTL: " .. smartCacheTTL)
-                
+
                 cacheValue = renderedResult.body
-                
+
                 -- Store rendered result to Redis Server cache
                 ok, err = red:set(cacheKey, cacheValue)
                 if not ok then
                     ngx.log(ngx.INFO, "NGINX-LUA-CACHE: Redis Server SET error: " .. err)
                 end
-                
+
                 red:expire(cacheKey, smartCacheTTL)
-                
             end
 
             -- Store cache data from Redis Server to shared cache provided by Nginx
             -- Default lifetime for data on shared Nginx cache - 5 seconds
             cache:set(cacheKey, cacheValue, 5)
-            
             ngx.log(ngx.INFO, "NGINX-LUA-CACHE: Cache from Redis Server stored to shared memory");
 
             -- Release redis server connection
