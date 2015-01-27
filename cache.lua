@@ -27,10 +27,6 @@
             end
 
             local res, err = red:get(cacheKey)
-            if not res then
-               ngx.say("failed to get dog: ", err)
-               return
-            end
 
             cacheValue = res
 
@@ -44,20 +40,29 @@
 
                 local renderedResult = ngx.location.capture(capturedLocation, {args = {uri = ngx.var.uri}})
                 if renderedResult.status ~= 200 then
-                   ngx.log(ngx.WARN, "NGINX-LUA-CACHE: Required cached location " .. capturedLocation .. " return status code " .. renderedResult.status)
-                   -- ngx.say("AA: " .. renderedResult.status)
-                   -- ngx.say("B: " .. renderedResult.body)
+                   ngx.log(ngx.INFO, "NGINX-LUA-CACHE:[RENDERING] Required cached location [" .. capturedLocation .. "] return status code " .. renderedResult.status)
                    return
+                else
+                   ngx.log(ngx.INFO, "NGINX-LUA-CACHE:[RENDERING] Required cached location [" .. capturedLocation .. "] rendered successfully")
                 end
+                
                 cacheValue = renderedResult.body
-                return
+                
+                -- Store rendered result to Redis Server cache
+                ok, err = red:set(cacheKey, cacheValue)
+                if not ok then
+                    ngx.log(ngx.INFO, "NGINX-LUA-CACHE: Redis Server SET error: " .. err)
+                end
+                
+                red:expire(cacheKey, 15)
+                
             end
 
             -- Store cache data from Redis Server to shared cache provided by Nginx
             -- Default lifetime for data on shared Nginx cache - 5 seconds
             cache:set(cacheKey, cacheValue, 5)
             
-            ngx.log(ngx.INFO, "Cache from Redis Server stored to shared memory");
+            ngx.log(ngx.INFO, "NGINX-LUA-CACHE: Cache from Redis Server stored to shared memory");
 
             -- Release redis server connection
             red:set_keepalive()
