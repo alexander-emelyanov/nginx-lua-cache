@@ -11,7 +11,7 @@
         -- Try load data from shared dictionary
         local cacheValue = cache:get(cacheKey)
         
-        if (cacheValue == nil) then
+        if cacheValue == nil then
 
             -- Shared dictionary return "not found", we gotta check Redis Server
             local redis = require "resty.redis"
@@ -35,7 +35,21 @@
             cacheValue = res
 
             if cacheValue == ngx.null then
-                ngx.say('{error: "Cache data not found"}')
+
+                -- If Redis Server cache empty - we'll try load data bu typical wal - GET request to another location, served by process manager, like php-fpm
+                local capturedLocation = "/" .. cacheKey
+
+                ngx.req.read_body()
+                ngx.req.set_uri(capturedLocation)
+
+                local renderedResult = ngx.location.capture(capturedLocation, {args = {uri = ngx.var.uri}})
+                if renderedResult.status ~= 200 then
+                   ngx.log(ngx.WARN, "NGINX-LUA-CACHE: Required cached location " .. capturedLocation .. " return status code " .. renderedResult.status)
+                   -- ngx.say("AA: " .. renderedResult.status)
+                   -- ngx.say("B: " .. renderedResult.body)
+                   return
+                end
+                cacheValue = renderedResult.body
                 return
             end
 
