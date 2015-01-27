@@ -46,6 +46,18 @@
                    ngx.log(ngx.INFO, "NGINX-LUA-CACHE:[RENDERING] Required cached location [" .. capturedLocation .. "] rendered successfully")
                 end
                 
+                local headersString = ""
+                for key, value in pairs(renderedResult.header) do
+            	    headersString = headersString .. key .. ": " .. value .. "\r\n"
+                end
+                ngx.say(headersString)
+                
+                local smartCacheTTL = renderedResult.header['X-Smart-Cache-TTL']
+                if smartCacheTTL == nil then
+            	    smartCacheTTL = 0
+                end
+                ngx.say("X-Smart-Cache-TTL: " .. smartCacheTTL)
+                
                 cacheValue = renderedResult.body
                 
                 -- Store rendered result to Redis Server cache
@@ -54,7 +66,7 @@
                     ngx.log(ngx.INFO, "NGINX-LUA-CACHE: Redis Server SET error: " .. err)
                 end
                 
-                red:expire(cacheKey, 15)
+                red:expire(cacheKey, smartCacheTTL)
                 
             end
 
